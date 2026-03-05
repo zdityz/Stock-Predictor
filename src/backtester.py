@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import os
 
-# --- 1. RECREATE THE CLASSIFIER ARCHITECTURE ---
 class StockClassifierLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(StockClassifierLSTM, self).__init__()
@@ -36,7 +35,7 @@ def create_binary_sequences(data, seq_length, close_col_index):
     return np.array(xs), np.array(ys)
 
 if __name__ == "__main__":
-    # --- 2. LOAD DATA & MODEL ---
+
     processed_data_path = "data/processed/scaled_AAPL_2010-01-01_2023-01-01.csv"
     model_path = "models/lstm_classifier.pth"
     raw_data_path = "data/raw/AAPL_2010-01-01_2023-01-01.csv"
@@ -72,33 +71,28 @@ if __name__ == "__main__":
         X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
         probabilities = model(X_test_tensor).cpu().numpy().flatten()
     
-    # --- 3. THE CONVICTION FILTER (NEW LOGIC) ---
     signals = np.zeros(len(probabilities))
-    current_position = 1 # We start by owning the stock
+    current_position = 1 
     
     for i in range(len(probabilities)):
-        if probabilities[i] > 0.60:    # High Conviction UP
+        if probabilities[i] > 0.60:    
             current_position = 1
-        elif probabilities[i] < 0.40:  # High Conviction DOWN
+        elif probabilities[i] < 0.40:  
             current_position = 0
-        # If between 0.40 and 0.60, current_position stays exactly what it was yesterday
         
         signals[i] = current_position
     
-    # --- 4. THE BACKTEST ENGINE ---
-    print("Running $10,000 Portfolio Simulation...") # Fixed escape character warning
+    print("Running $10,000 Portfolio Simulation...") 
     
     bt_df = pd.DataFrame(index=test_dates)
     bt_df['Real_Price'] = raw_df.loc[test_dates, 'Close'].values
     bt_df['Market_Return'] = bt_df['Real_Price'].pct_change()
     bt_df['AI_Signal'] = signals
     
-    # SHIFT THE SIGNAL: Trade tomorrow based on today's signal
     bt_df['AI_Position'] = bt_df['AI_Signal'].shift(1)
     bt_df['Strategy_Return'] = bt_df['Market_Return'] * bt_df['AI_Position']
     bt_df.fillna(0, inplace=True)
-    
-    # --- 5. CALCULATE PORTFOLIO VALUE ---
+
     INITIAL_CAPITAL = 10000.0
     
     bt_df['Market_Portfolio'] = INITIAL_CAPITAL * (1 + bt_df['Market_Return']).cumprod()
@@ -122,8 +116,7 @@ if __name__ == "__main__":
         print("🏆 YOUR AI BEAT THE MARKET!")
     else:
         print("📉 The Market beat your AI. (Time to tweak parameters).")
-    
-    # --- 6. PLOTTING THE EQUITY CURVE ---
+
     print("\nGenerating Equity Curve Chart...")
     plt.figure(figsize=(14, 7))
     
@@ -134,7 +127,6 @@ if __name__ == "__main__":
     plt.xlabel("Date")
     plt.ylabel("Portfolio Value (USD)")
     
-    # Fixed Matplotlib Warning for Y-Axis Formatting
     fmt = '${x:,.0f}'
     tick = mtick.StrMethodFormatter(fmt)
     plt.gca().yaxis.set_major_formatter(tick)

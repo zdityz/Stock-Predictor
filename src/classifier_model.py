@@ -5,25 +5,20 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import os
 
-# --- 1. DATA PREPARATION (The Binary Shift) ---
 def create_binary_sequences(data, seq_length, close_col_index):
     xs, ys = [], []
     for i in range(len(data) - seq_length):
         x = data[i:(i + seq_length)]
         
-        # Today's Close Price
         current_close = data[i + seq_length - 1, close_col_index]
-        # Tomorrow's Close Price
         next_close = data[i + seq_length, close_col_index]
         
-        # THE MAGIC LOGIC: 1 if it goes up, 0 if it goes down
         y = 1.0 if next_close > current_close else 0.0
         
         xs.append(x)
         ys.append(y)
     return np.array(xs), np.array(ys)
 
-# --- 2. THE NEURAL NETWORK (Classifier) ---
 class StockClassifierLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(StockClassifierLSTM, self).__init__()
@@ -31,7 +26,6 @@ class StockClassifierLSTM(nn.Module):
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
-        # Add a Sigmoid activation to squash the output between 0% and 100% probability
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -39,7 +33,7 @@ class StockClassifierLSTM(nn.Module):
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.lstm(x, (h0, c0))
         out = self.fc(out[:, -1, :])
-        out = self.sigmoid(out) # Squashes the final number
+        out = self.sigmoid(out)
         return out
 
 if __name__ == "__main__":
@@ -47,10 +41,9 @@ if __name__ == "__main__":
     df = pd.read_csv(data_path, index_col=0, parse_dates=True)
     
     columns = list(df.columns)
-    close_idx = columns.index('Close') # We use Close to calculate Up/Down
+    close_idx = columns.index('Close') 
     data_array = df.values 
-    
-    # Hyperparameters
+
     SEQ_LENGTH = 60
     INPUT_SIZE = len(columns)
     HIDDEN_SIZE = 50
@@ -78,7 +71,6 @@ if __name__ == "__main__":
     
     model = StockClassifierLSTM(INPUT_SIZE, HIDDEN_SIZE, NUM_LAYERS, OUTPUT_SIZE).to(device)
     
-    # NEW MATH: Binary Cross Entropy Loss (The gold standard for Yes/No AI)
     criterion = nn.BCELoss() 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
@@ -101,8 +93,6 @@ if __name__ == "__main__":
             
             epoch_loss += loss.item()
             
-            # Calculate accuracy on the fly
-            # If probability > 0.5, we guess "UP" (1)
             predicted_classes = (outputs > 0.5).float()
             correct_predictions += (predicted_classes == batch_y).sum().item()
             total_predictions += batch_y.size(0)

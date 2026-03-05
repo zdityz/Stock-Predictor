@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import os
 
-# --- 1. RECREATE THE MODEL ARCHITECTURE ---
 class StockPredictorLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(StockPredictorLSTM, self).__init__()
@@ -42,7 +41,6 @@ if __name__ == "__main__":
     log_return_idx = columns.index('Log_Return')
     data_array = df.values
     
-    # Recreate the scaler JUST for Log_Return so we can un-scale it back to real percentages
     raw_df = pd.read_csv(raw_data_path, index_col=0, parse_dates=True)
     raw_df['Log_Return'] = np.log(raw_df['Close'] / raw_df['Close'].shift(1))
     raw_df.dropna(inplace=True) 
@@ -50,7 +48,6 @@ if __name__ == "__main__":
     return_scaler = MinMaxScaler(feature_range=(0, 1))
     return_scaler.fit(raw_df[['Log_Return']]) 
 
-    # Hyperparameters
     SEQ_LENGTH = 60
     INPUT_SIZE = len(columns)
     HIDDEN_SIZE = 50
@@ -79,14 +76,12 @@ if __name__ == "__main__":
     predictions_real = return_scaler.inverse_transform(predictions)
     y_test_true_real = return_scaler.inverse_transform(y_test_true.reshape(-1, 1))
     
-    # To make the chart readable, let's just plot the last 100 days of the test set
     plot_days = 100
     
     plt.figure(figsize=(14, 7))
     plt.plot(test_dates[-plot_days:], y_test_true_real[-plot_days:], label="Actual Daily Return", color="blue", linewidth=2)
     plt.plot(test_dates[-plot_days:], predictions_real[-plot_days:], label="AI Predicted Return", color="red", linestyle="dashed", linewidth=1.5)
     
-    # Add a horizontal line at 0 (the difference between a winning day and a losing day)
     plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
     
     plt.title(f"AI Model vs Reality: Predicting Daily Returns (Last {plot_days} Days)")

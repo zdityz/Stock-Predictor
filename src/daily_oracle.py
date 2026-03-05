@@ -9,10 +9,8 @@ from sklearn.preprocessing import MinMaxScaler
 import warnings
 import os
 
-# Suppress annoying terminal warnings for a clean interface
 warnings.filterwarnings('ignore')
 
-# --- 1. RECREATE THE CLASSIFIER ARCHITECTURE ---
 class StockClassifierLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(StockClassifierLSTM, self).__init__()
@@ -32,10 +30,8 @@ class StockClassifierLSTM(nn.Module):
 
 def get_live_prediction(ticker="AAPL"):
     print(f"📡 Fetching live market data for {ticker}...")
-    # We download 10 years to ensure our MinMaxScaler matches the training scale perfectly
     df = yf.download(ticker, period="10y", auto_adjust=True, progress=False)
     
-    # Fix the yfinance MultiIndex issue if it appears
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
@@ -55,11 +51,9 @@ def get_live_prediction(ticker="AAPL"):
     feature_columns = ['Close', 'Volume', 'SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'Log_Return']
     scaled_data = scaler.fit_transform(df[feature_columns])
 
-    # Grab EXACTLY the last 60 days of the market
     SEQ_LENGTH = 60
     recent_sequence = scaled_data[-SEQ_LENGTH:]
     
-    # Convert to PyTorch Tensor format: (Batch Size, Sequence Length, Features) -> (1, 60, 8)
     x_tensor = torch.tensor(recent_sequence, dtype=torch.float32).unsqueeze(0)
 
     print("🧠 Waking up the Neural Network...")
@@ -72,14 +66,12 @@ def get_live_prediction(ticker="AAPL"):
 
     model = StockClassifierLSTM(input_size=len(feature_columns), hidden_size=50, num_layers=2, output_size=1).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    model.eval() # Tell it to predict, not learn
+    model.eval() 
 
-    # --- THE PREDICTION ---
     with torch.no_grad():
         x_tensor = x_tensor.to(device)
         probability = model(x_tensor).item()
 
-    # --- THE VERDICT ---
     print("\n" + "="*50)
     print(f"🔮 THE DAILY ORACLE: {ticker}")
     print("="*50)
@@ -101,6 +93,4 @@ def get_live_prediction(ticker="AAPL"):
     print("="*50 + "\n")
 
 if __name__ == "__main__":
-    # You can change this ticker to test it on other stocks, 
-    # but remember the AI was specifically trained on AAPL's behavior!
     get_live_prediction("AAPL")
