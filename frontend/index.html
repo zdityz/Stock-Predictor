@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Stock Oracle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen font-sans p-4">
+
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl text-center border border-gray-700 flex flex-col items-center">
+        
+        <h1 class="text-4xl font-bold mb-2 tracking-wide text-blue-400">🔮 Daily Oracle</h1>
+        <p class="text-gray-400 mb-8 text-sm uppercase tracking-widest">Deep Learning Trading Terminal</p>
+
+        <div class="flex space-x-2 mb-6 w-full max-w-md">
+            <input type="text" id="tickerInput" value="AAPL" 
+                class="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-600 text-white uppercase focus:outline-none focus:border-blue-500 font-bold tracking-widest text-center"
+                placeholder="TICKER (e.g. AAPL)">
+            <button onclick="fetchPrediction()" id="predictBtn"
+                class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold transition-all shadow-lg">
+                Run AI
+            </button>
+        </div>
+
+        <div id="tv_chart_container" class="w-full h-96 mb-6 hidden rounded-lg overflow-hidden border border-gray-700 bg-gray-900 shadow-inner"></div>
+
+        <div id="resultBox" class="hidden w-full max-w-md flex flex-col items-center space-y-4 pt-4 border-t border-gray-700">
+            
+            <div class="flex justify-between w-full text-gray-300 text-lg px-4">
+                <span>Latest Close:</span>
+                <span id="priceDisplay" class="font-bold text-white">---</span>
+            </div>
+            
+            <div class="flex justify-between w-full text-gray-300 text-lg px-4">
+                <span>AI Confidence (Up):</span>
+                <span id="probDisplay" class="font-bold text-white">---</span>
+            </div>
+
+            <div id="signalBadge" class="mt-4 w-full py-4 rounded-lg text-3xl font-black tracking-widest shadow-lg">
+                ---
+            </div>
+        </div>
+
+        <p id="loadingText" class="hidden text-gray-400 mt-4 animate-pulse font-bold tracking-widest text-sm uppercase">Consulting the Neural Network...</p>
+        <p id="errorText" class="hidden text-red-400 mt-4 text-sm font-bold"></p>
+
+    </div>
+
+    <script>
+        async function fetchPrediction() {
+            const ticker = document.getElementById('tickerInput').value.toUpperCase();
+            const btn = document.getElementById('predictBtn');
+            const resultBox = document.getElementById('resultBox');
+            const chartBox = document.getElementById('tv_chart_container');
+            const loadingText = document.getElementById('loadingText');
+            const errorText = document.getElementById('errorText');
+            
+            resultBox.classList.add('hidden');
+            chartBox.classList.add('hidden');
+            errorText.classList.add('hidden');
+            loadingText.classList.remove('hidden');
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            chartBox.classList.remove('hidden');
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": ticker,
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "enable_publishing": false,
+                "backgroundColor": "#111827", 
+                "gridColor": "#374151",     
+                "hide_top_toolbar": false,
+                "hide_legend": false,
+                "save_image": false,
+                "container_id": "tv_chart_container"
+            });
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/predict/${ticker}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Failed to fetch data.");
+                }
+
+                document.getElementById('priceDisplay').innerText = `$${data.latest_price}`;
+                document.getElementById('probDisplay').innerText = `${data.prediction_probability}%`;
+
+                const badge = document.getElementById('signalBadge');
+                badge.innerText = data.signal;
+                badge.className = "mt-4 w-full py-4 rounded-lg text-3xl font-black tracking-widest shadow-lg"; // Reset classes
+                
+                if (data.signal === "BUY") {
+                    badge.classList.add("bg-green-600", "text-white", "border", "border-green-400");
+                } else if (data.signal === "SELL") {
+                    badge.classList.add("bg-red-600", "text-white", "border", "border-red-400");
+                } else {
+                    badge.classList.add("bg-yellow-500", "text-gray-900", "border", "border-yellow-300");
+                }
+
+                loadingText.classList.add('hidden');
+                resultBox.classList.remove('hidden');
+
+            } catch (error) {
+                loadingText.classList.add('hidden');
+                chartBox.classList.add('hidden');
+                errorText.innerText = "❌ " + error.message;
+                errorText.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+    </script>
+</body>
+</html>
