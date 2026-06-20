@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, SMAIndicator
-from sklearn.preprocessing import MinMaxScaler
 import warnings
 import os
+import joblib
 
 warnings.filterwarnings('ignore')
 
@@ -30,7 +30,7 @@ class StockClassifierLSTM(nn.Module):
 
 def get_live_prediction(ticker="AAPL"):
     print(f"📡 Fetching live market data for {ticker}...")
-    df = yf.download(ticker, period="10y", auto_adjust=True, progress=False)
+    df = yf.download(ticker, period="2y", auto_adjust=True, progress=False)
     
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -46,14 +46,22 @@ def get_live_prediction(ticker="AAPL"):
     
     df.dropna(inplace=True)
 
-    print("⚖️ Normalizing data for the AI...")
-    scaler = MinMaxScaler(feature_range=(0, 1))
+    print("⚖️ Normalizing data against historical bounds...")
+    scaler_path = "models/scaler.pkl"
+    if not os.path.exists(scaler_path):
+        print(f"❌ Error: Cannot find {scaler_path}. Run features.py first.")
+        return
+
+    scaler = joblib.load(scaler_path)
     feature_columns = ['Close', 'Volume', 'SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'Log_Return']
-    scaled_data = scaler.fit_transform(df[feature_columns])
+    scaled_data = scaler.transform(df[feature_columns])
 
     SEQ_LENGTH = 60
+    if len(scaled_data) < SEQ_LENGTH:
+        print("❌ Error: Not enough data to form a 60-day sequence.")
+        return
+
     recent_sequence = scaled_data[-SEQ_LENGTH:]
-    
     x_tensor = torch.tensor(recent_sequence, dtype=torch.float32).unsqueeze(0)
 
     print("🧠 Waking up the Neural Network...")
@@ -76,7 +84,7 @@ def get_live_prediction(ticker="AAPL"):
     print(f"🔮 THE DAILY ORACLE: {ticker}")
     print("="*50)
     
-    latest_close = df['Close'].iloc[-1]
+    latest_close = float(df['Close'].iloc[-1])
     latest_date = df.index[-1].strftime('%Y-%m-%d')
     print(f"Last Market Close ({latest_date}): ${latest_close:.2f}")
     print(f"AI 'UP' Probability for Next Session: {probability * 100:.2f}%\n")

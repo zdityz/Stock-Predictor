@@ -5,13 +5,16 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import os
 
-def create_binary_sequences(data, seq_length, close_col_index):
+def create_binary_sequences(data_df, seq_length):
     xs, ys = [], []
-    for i in range(len(data) - seq_length):
-        x = data[i:(i + seq_length)]
-        
-        current_close = data[i + seq_length - 1, close_col_index]
-        next_close = data[i + seq_length, close_col_index]
+    feature_cols = [c for c in data_df.columns if c != 'Close']
+    feature_data = data_df[feature_cols].values
+    close_data = data_df['Close'].values
+    
+    for i in range(len(data_df) - seq_length):
+        x = feature_data[i:(i + seq_length)]
+        current_close = close_data[i + seq_length - 1]
+        next_close = close_data[i + seq_length]
         
         y = 1.0 if next_close > current_close else 0.0
         
@@ -37,15 +40,11 @@ class StockClassifierLSTM(nn.Module):
         return out
 
 if __name__ == "__main__":
-    data_path = "data/processed/scaled_AAPL_2010-01-01_2023-01-01.csv"
+    data_path = "data/processed/multimodal_AAPL_ALPHA_2010-01-01_2023-01-01.csv"
     df = pd.read_csv(data_path, index_col=0, parse_dates=True)
     
-    columns = list(df.columns)
-    close_idx = columns.index('Close') 
-    data_array = df.values 
-
     SEQ_LENGTH = 60
-    INPUT_SIZE = len(columns)
+    INPUT_SIZE = len(df.columns) - 1 
     HIDDEN_SIZE = 50
     NUM_LAYERS = 2
     OUTPUT_SIZE = 1         
@@ -53,8 +52,8 @@ if __name__ == "__main__":
     EPOCHS = 40             
     BATCH_SIZE = 32         
     
-    print("Generating Binary (Up/Down) sequences...")
-    X, y = create_binary_sequences(data_array, SEQ_LENGTH, close_col_index=close_idx)
+    print("Generating Stationary sequences...")
+    X, y = create_binary_sequences(df, SEQ_LENGTH)
     
     train_size = int(len(X) * 0.8)
     X_train, y_train = X[:train_size], y[:train_size]
@@ -64,7 +63,7 @@ if __name__ == "__main__":
     y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
     
     dataset = TensorDataset(X_train_tensor, y_train_tensor)
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
     
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -74,7 +73,7 @@ if __name__ == "__main__":
     criterion = nn.BCELoss() 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
-    print("\nStarting Training Phase (Binary Classifier)...")
+    print("\nStarting Stationary Training Phase...")
     for epoch in range(EPOCHS):
         model.train()
         epoch_loss = 0
@@ -104,4 +103,4 @@ if __name__ == "__main__":
 
     os.makedirs("models", exist_ok=True)
     torch.save(model.state_dict(), "models/lstm_classifier.pth")
-    print("\nTraining complete! Model saved to models/lstm_classifier.pth")
+    print("\nTraining complete. Stationary Model saved to models/lstm_classifier.pth")
